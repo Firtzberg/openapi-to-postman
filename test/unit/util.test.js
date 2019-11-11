@@ -29,9 +29,42 @@ describe('UTILITY FUNCTION TESTS ', function () {
               $ref: '#/components/schemas/schema2'
             }
           }
-        };
+        },
+        bodyType = 'REQUEST';
 
-      expect(Utils.safeSchemaFaker(schema, components)).to.equal('<string>');
+      expect(Utils.safeSchemaFaker(schema, bodyType, components)).to.equal('<string>');
+      done();
+    });
+
+    it('should resolve circular structures', function(done) {
+      let schema = {
+          '$ref': '#/components/schemas/a'
+        },
+        components = {
+          schemas: {
+            'a': {
+              'type': 'array',
+              'items': {
+                '$ref': '#/components/schemas/b'
+              }
+            },
+            'b': {
+              'type': 'object',
+              'properties': {
+                'c': {
+                  '$ref': '#/components/schemas/a'
+                }
+              }
+            }
+          }
+        },
+        bodyType = 'REQUEST',
+
+        result = Utils.safeSchemaFaker(schema, bodyType, components),
+        tooManyLevelsString = result[0].c[0].c[0].c[0].c[0].c.value;
+
+      expect(result).to.not.equal(null);
+      expect(tooManyLevelsString).to.equal('<Error: Too many levels of nesting to fake this schema>');
       done();
     });
 
@@ -62,10 +95,11 @@ describe('UTILITY FUNCTION TESTS ', function () {
               $ref: '#/components/schem2'
             }
           }
-        };
+        },
+        bodyType = 'REQUEST';
 
       expect(function() {
-        Utils.safeSchemaFaker(schema, components);
+        Utils.safeSchemaFaker(schema, bodyType, components);
       }).to.throw(openApiErr, 'Invalid schema reference: #/components/schem2');
       done();
     });
@@ -572,7 +606,7 @@ describe('UTILITY FUNCTION TESTS ', function () {
   });
 
   describe('getRefObject', function() {
-    it('Should convert schemas where compnents have refs to other components', function (done) {
+    it('Should convert schemas where components have refs to other components', function (done) {
       Utils.components = {
         'responses': {
           'TooManyRequests': {
@@ -608,9 +642,9 @@ describe('UTILITY FUNCTION TESTS ', function () {
       done();
     });
 
-    it('Should convert schemas with references to paths (using ~1 and ~0)', function (done) {
+    it('Should convert schemas with references to paths (using ~1, ~0, and Percent Encoding)', function (done) {
       Utils.paths = {
-        '/category': {
+        '/category/{id}': {
           get: {
             summary: 'Summary',
             parameters: [{
@@ -624,7 +658,7 @@ describe('UTILITY FUNCTION TESTS ', function () {
           }
         }
       };
-      var resolvedObject = Utils.getRefObject('#/paths/~1category/get/parameters/0');
+      var resolvedObject = Utils.getRefObject('#/paths/~1category~1%7Bid%7D/get/parameters/0');
       expect(resolvedObject.description).to.equal('Sample description');
       expect(resolvedObject.name).to.equal('expand');
       done();
